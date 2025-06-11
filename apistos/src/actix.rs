@@ -46,6 +46,51 @@ impl ApiComponent for NoContent {
   }
 }
 
+// OkJson for 200 status code
+pub struct OKJson<T: Serialize + ApiComponent>(pub T);
+
+impl<T> Responder for OKJson<T>
+where
+    T: Serialize + ApiComponent,
+{
+  type Body = BoxBody;
+
+  fn respond_to(self, _req: &HttpRequest) -> HttpResponse<Self::Body> {
+    let status = StatusCode::OK;
+    let body = match serde_json::to_string(&self.0) {
+      Ok(body) => body,
+      Err(e) => return e.error_response(),
+    };
+
+    HttpResponse::build(status).content_type("application/json").body(body)
+  }
+}
+
+impl<T> ApiComponent for OKJson<T>
+where
+    T: Serialize + ApiComponent,
+{
+  fn child_schemas() -> Vec<(String, ReferenceOr<Schema>)> {
+    T::child_schemas()
+  }
+
+  fn raw_schema() -> Option<ReferenceOr<Schema>> {
+    T::raw_schema()
+  }
+
+  fn schema() -> Option<(String, ReferenceOr<Schema>)> {
+    T::schema()
+  }
+
+  fn request_body() -> Option<RequestBody> {
+    None
+  }
+
+  fn responses(_content_type: Option<String>) -> Option<Responses> {
+    let status = StatusCode::OK;
+    response_from_schema(status, Self::schema()).or_else(|| response_from_raw_schema(status, Self::raw_schema()))
+  }
+}
 /// Empty struct to represent a 202 with a body
 pub struct AcceptedJson<T: Serialize + ApiComponent>(pub T);
 
